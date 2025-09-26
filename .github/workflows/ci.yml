@@ -2,7 +2,7 @@ name: Build and Push Speaking Exercise Docker Image
 
 on:
   release:
-    types: [created]
+    types: [published]
 
 # 使用并发取消任何当前作业或运行
 concurrency:
