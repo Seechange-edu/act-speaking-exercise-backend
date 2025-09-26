@@ -1,0 +1,91 @@
+name: Build and Push Speaking Exercise Docker Image
+
+on:
+  release:
+    types: [created]
+
+# 使用并发取消任何当前作业或运行
+concurrency:
+  group: ${{github.ref}}
+  cancel-in-progress: true
+
+jobs:
+  action_trigger:
+    if:  startsWith(github.ref, 'refs/tags/speaking-exercise-backend/')
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+      - name: get tag info
+        uses: Seechange-edu/Parse-Action-Tag
+        with:
+          githubToken: ${{ secrets.ACTION_TOKEN }}
+          type: parse
+
+      - name: checkout code
+        uses: actions/checkout@v4
+        with:
+          repository: SeeChange-edu/${{ env.REPOSITORY }}
+          token: ${{ secrets.ACTION_TOKEN }}
+          ref: ${{ env.BRANCH }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: corretto
+          cache: maven
+
+      - name: Maven Build
+        run: mvn package -T 1C -D skipTests -D fast
+
+      - name: Build and push Docker image
+        run: |
+          echo ${{ secrets.TOKEN }} | docker login registry.digitalocean.com -u hilton.lam@asiaalliedgroup.com --password-stdin
+          docker build --tag ${{ env.IMAGE }} --file Dockerfile-Self .
+          docker push ${{ env.IMAGE }}
+
+      - name: SSH and Run Docker image
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ vars.REMOTE_HOST }}
+          username: ${{ vars.REMOTE_USER }}
+          key: ${{ secrets.REMOTE_SSH_KEY }}
+          script: |
+            docker pull ${{ env.IMAGE }}
+            if [ "$(docker ps -a --format '{{.Names}}' | grep -c ${{ env.NAME }})" -gt 0 ]; then 
+              docker rm -f ${{ env.NAME }}
+            fi
+            docker run --name ${{ env.NAME }} -d -p ${{ env.OUT_PORT }}:${{ env.PORT }} -p ${{ env.OUT_PORT1 }}:${{ env.PORT1 }} ${{ env.RUN_ARGS }} --restart unless-stopped ${{ env.IMAGE }}
+            docker image prune --force
+            docker container prune --force
+
+  notify-teams:
+    if: always()
+    needs: [ action_trigger ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Teams Notification
+        env:
+          WEBHOOK: ${{ vars.TEAMS_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          curl -X POST -H "Content-Type: application/json" \
+          -d '{
+            "@type": "MessageCard",
+            "@context": "http://schema.org/extensions",
+            "themeColor": "${{ needs.action_trigger.result == 'success' && '00FF00' || 'FF0000' }}",
+            "summary": "${{ needs.action_trigger.result == 'success' && '🎉 Build succeeded!' || '❌ Build failed!' }}:${{ github.repository }}:${{ github.workflow }}",
+            "title": "${{ needs.action_trigger.result == 'success' && '🎉 Build succeeded!' || '❌ Build failed!' }}:${{ github.repository }}:${{ github.workflow }}",
+            "sections": [{
+              "facts": [
+                { "name": "Repository", "value": "${{ github.repository }}" },
+                { "name": "Triggered by", "value": "${{ github.event_name }}" },
+                { "name": "Commit Message", "value": "${{ github.event.head_commit.message }}" },
+                { "name": "Author", "value": "@${{ github.actor }}" },
+                { "name": "Result", "value": "${{ needs.action_trigger.result }}" }
+              ],
+              "text": "[View Workflow Run](${{ env.RUN_URL }})"
+            }]
+          }' \
+          "$WEBHOOK"
