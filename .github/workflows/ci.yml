@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
     steps:
       - name: get tag info
-        uses: Seechange-edu/Parse-Action-Tag
+        uses: Seechange-edu/Parse-Action-Tag@main
         with:
           githubToken: ${{ secrets.ACTION_TOKEN }}
           type: parse
