@@ -69,7 +69,7 @@ jobs:
       - name: SSH and Run Docker image
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ vars.AWS_DEVELOPMENT_SERVER_IP }}
+          host: ${{ env.REMOTE_HOST }}
           username: ${{ vars.AWS_DEVELOPMENT_SERVER_LOGIN }}
           key: ${{ secrets.REMOTE_AWS_DEV_PRIVATE_SSH_KEY }}
           envs: ECR_REGISTRY,ECR_REPOSITORY,ACTIVE,ECR_TOKEN
