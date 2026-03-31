@@ -73,12 +73,12 @@ jobs:
           host: ${{ env.REMOTE_HOST }}
           username: ${{ vars.AWS_DEVELOPMENT_SERVER_LOGIN }}
           key: ${{ secrets.REMOTE_AWS_DEV_PRIVATE_SSH_KEY }}
-          envs: ECR_REGISTRY,ECR_REPOSITORY,ACTIVE,ECR_TOKEN
+          envs: ECR_REGISTRY,ECR_REPOSITORY,ACTIVE,ECR_TOKEN,tagName
           script: |
             # Login to AWS ECR using temporary token from GitHub Actions
             echo ${ECR_TOKEN} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
             
-            IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}/${ACTIVE}:${ACTIVE}"
+            IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}/${ACTIVE}:${tagName}"
             docker pull ${IMAGE_URI}
             if [ "$(docker ps -a --format '{{.Names}}' | grep -c ${{ env.NAME }})" -gt 0 ]; then 
               docker rm -f ${{ env.NAME }}
@@ -91,6 +91,7 @@ jobs:
           ECR_REPOSITORY: ${{ secrets.AWS_ECR_REPOSITORY }}
           ACTIVE: ${{ env.ACTIVE }}
           ECR_TOKEN: ${{ steps.ecr-login-token.outputs.token }}
+          tagName: ${{ env.BRANCH }}
 
   notify-teams:
     if: always()
