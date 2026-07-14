@@ -98,7 +98,9 @@ jobs:
               --log-opt awslogs-create-group=true \
               ${IMAGE_URI}
             docker image prune --force
-            docker container prune --force
+            # Disabled: the old container is already removed by name above, and pruning here would delete
+            # a container that crashed on startup, taking its logs with it.
+            # docker container prune --force
         env:
           ECR_REGISTRY: ${{ steps.login-pf-aws-ecr.outputs.registry }}
           ECR_TOKEN: ${{ steps.ecr-login-token.outputs.token }}
