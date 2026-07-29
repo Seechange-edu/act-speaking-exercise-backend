@@ -111,7 +111,12 @@ jobs:
           tagName: ${{ env.BRANCH }}
         run: |
           IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}/${ACTIVE}:${tagName}"
-          docker build --tag ${IMAGE_URI} --file Dockerfile-Self .
+          # Prefer Dockerfile.deploy; fall back to the old Dockerfile-Self for tags/branches
+          # built before the rename.
+          # Prefer Dockerfile.deploy; fall back to the old Dockerfile-Self for pre-rename tags.
+          if [ -f Dockerfile.deploy ]; then DOCKERFILE=Dockerfile.deploy; else DOCKERFILE=Dockerfile-Self; fi
+          echo "DOCKERFILE_USED=${DOCKERFILE}" >> $GITHUB_ENV
+          docker build --tag ${IMAGE_URI} --file "${DOCKERFILE}" .
           docker push ${IMAGE_URI}
           echo "IMAGE_URI=${IMAGE_URI}" >> $GITHUB_ENV
 
@@ -138,9 +143,14 @@ jobs:
             if [ "$(docker ps -a --format '{{.Names}}' | grep -c ${{ env.NAME }})" -gt 0 ]; then
               docker rm -f ${{ env.NAME }}
             fi
+            # Dockerfile.deploy bakes env into the image; the old Dockerfile-Self needs the host env file.
+            ENV_FILE_ARG=""
+            if [ "${{ env.DOCKERFILE_USED }}" != "Dockerfile.deploy" ]; then
+              ENV_FILE_ARG="--env-file /home/forge/env.think-and-speak/${{ env.ACTIVE }}.env"
+            fi
             docker run -d \
               --name ${{ env.NAME }} \
-              --env-file /home/forge/env.think-and-speak/${{ env.ACTIVE }}.env \
+              ${ENV_FILE_ARG} \
               -p ${{ env.OUT_PORT }}:${{ env.PORT }} \
               -p ${{ env.OUT_PORT1 }}:${{ env.PORT1 }} \
               ${{ env.RUN_ARGS }} \
