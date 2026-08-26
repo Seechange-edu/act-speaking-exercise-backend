@@ -207,7 +207,7 @@ jobs:
           key: ${{ secrets.REMOTE_AWS_DEV_PRIVATE_SSH_KEY }}
           envs: ECR_REGISTRY,ECR_REPOSITORY,IMAGE_TAG,ACTIVE
           script: |
-            IMAGE_PREFIX"${ECR_REGISTRY}/${ECR_REPOSITORY}/${ACTIVE}"
+            IMAGE_PREFIX="${ECR_REGISTRY}/${ECR_REPOSITORY}/${ACTIVE}"
             CURRENT="${IMAGE_TAG}"
 
             if ! echo "$CURRENT" | grep -qE '^[vV][0-9]+\.[0-9]+\.[0-9]+$'; then
