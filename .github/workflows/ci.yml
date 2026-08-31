@@ -86,9 +86,20 @@ jobs:
           java-version: '21'
           distribution: corretto
           cache: maven
+          # api-meter's SDK is a Maven dependency published to GitHub Packages,
+          # which needs credentials to read — unlike Maven Central. This writes a
+          # settings.xml for `github`, the repository id declared in the source
+          # repo's pom. ACTION_TOKEN rather than GITHUB_TOKEN: the package lives
+          # in a different repository, and GITHUB_TOKEN is scoped to this one.
+          server-id: github
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
 
       - name: Maven Build
         run: mvn package -T 1C -D skipTests -D fast
+        env:
+          MAVEN_USERNAME: ${{ github.actor }}
+          MAVEN_PASSWORD: ${{ secrets.ACTION_TOKEN }}
 
       - name: Setup AWS ECR Details (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
