@@ -172,6 +172,24 @@ jobs:
               --log-opt awslogs-stream=${{ env.ACTIVE }} \
               --log-opt awslogs-create-group=true \
               ${IMAGE_URI}
+            # docker run -d plus --restart unless-stopped otherwise reports success
+            # while the JVM crash-loops (missing bean, Flyway, bad env).
+            for i in $(seq 1 40); do
+              if curl -sf "http://127.0.0.1:${{ env.OUT_PORT }}/common/health/check" >/dev/null; then
+                echo "health check passed on attempt ${i}"
+                exit 0
+              fi
+              STATE=$(docker inspect --format '{{.State.Status}} restarting={{.State.Restarting}} exit={{.State.ExitCode}}' "${{ env.NAME }}" 2>/dev/null || echo missing)
+              echo "health check attempt ${i}: ${STATE}"
+              case "${STATE}" in
+                *restarting=true*) echo "container is restarting; aborting wait"; break ;;
+              esac
+              sleep 3
+            done
+            echo "health check failed; last container state:"
+            docker inspect --format '{{json .State}}' "${{ env.NAME }}" || true
+            docker logs --tail 200 "${{ env.NAME }}" || true
+            exit 1
             # Image pruning moved to the prune-images job, which never fails the
             # run: a prune already running on the host would fail this script and
             # mark a deploy that actually succeeded as red.
